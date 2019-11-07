@@ -25,6 +25,8 @@ namespace BLUECATS.ToastNotifier
     /// </summary>
     public partial class App : Application
     {
+        private IActorRef notificationActor;
+
         public System.Windows.Forms.NotifyIcon NotifyIcon { get; set; }
         public Notifier Notifier { get; set; }
         public string GUID { get; set; }
@@ -52,7 +54,9 @@ namespace BLUECATS.ToastNotifier
             try
             {
                 var system = ActorSystem.Create("BLUECATS-ToastNotifier", config);
-                var notificationActor = system.ActorOf(NotificationActor.Props(Notifier), nameof(NotificationActor));
+
+                notificationActor = system.ActorOf(NotificationActor.Props(Notifier), nameof(NotificationActor));
+                var parserActor = system.ActorOf(ParserActor.Props(notificationActor), nameof(ParserActor));
 
                 var consumerSettings = ConsumerSettings<Null, string>.Create(system, null, Deserializers.Utf8)
                     .WithBootstrapServers(GetBootStrapServers(config))
@@ -66,7 +70,7 @@ namespace BLUECATS.ToastNotifier
                     maxBackoff: TimeSpan.FromSeconds(30),
                     randomFactor: 0.2).RunForeach(result =>
                     {
-                        notificationActor.Tell((NotificationLevel.Error, $"Consumer: {result.Topic}/{result.Partition} {result.Offset}: {result.Value}"));
+                        parserActor.Tell(result);
                     }, system.Materializer());
             }
             catch (Exception ex)
@@ -113,7 +117,7 @@ namespace BLUECATS.ToastNotifier
 
                 cfg.LifetimeSupervisor = new TimeAndCountBasedLifetimeSupervisor(
                     notificationLifetime: TimeSpan.FromSeconds(5),
-                    maximumNotificationCount: MaximumNotificationCount.FromCount(12));
+                    maximumNotificationCount: MaximumNotificationCount.FromCount(14));
 
                 cfg.Dispatcher = Application.Current.Dispatcher;
             });
@@ -131,7 +135,11 @@ namespace BLUECATS.ToastNotifier
             NotifyIcon.Visible = true;
 
             menu.MenuItems.Add(new System.Windows.Forms.MenuItem(@"&All Clear",
-                onClick: (_, __) => Notifier.ClearMessages(new ClearAll())));
+                onClick: (_, __) =>
+                {
+                    notificationActor.Tell(new ClearAll());
+                    Notifier.ClearMessages(new ClearAll());
+                }));
 
             menu.MenuItems.Add(new System.Windows.Forms.MenuItem(@"&Exit",
                     onClick: (_, __) =>

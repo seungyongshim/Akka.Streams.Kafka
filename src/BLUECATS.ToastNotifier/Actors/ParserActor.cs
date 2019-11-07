@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Confluent.Kafka;
 using Newtonsoft.Json;
 using ToastNotifications;
 using ToastNotifications.Messages;
@@ -20,16 +21,23 @@ namespace BLUECATS.ToastNotifier.Actors
 
         public ParserActor(IActorRef notificationActor)
         {
-            Receive<string>(msg =>
+            Receive<ConsumeResult<Null, string>>(msg =>
             {
-                
-                dynamic json = JsonConvert.DeserializeObject(msg, new JsonSerializerSettings()
+                dynamic json = JsonConvert.DeserializeObject(msg.Value, new JsonSerializerSettings()
                 {
+                    DateTimeZoneHandling = DateTimeZoneHandling.Local,
                 });
-                var levelstring = json.Level.ToString();
+                string message = json.message.ToString();
+                string localtime = json["@timestamp"];
 
 
+                var sb = new StringBuilder();
+                notificationActor.Tell(
+                    (NotificationLevel.Error,
+                    sb.AppendLine(string.Format($"[{msg.Topic}]")).Append(msg.Value).ToString())
+                );
             });
+
         }
     }
 }

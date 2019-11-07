@@ -6,6 +6,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using ToastNotifications;
+using ToastNotifications.Lifetime.Clear;
 using ToastNotifications.Messages;
 
 namespace BLUECATS.ToastNotifier.Actors
@@ -40,29 +41,28 @@ namespace BLUECATS.ToastNotifier.Actors
                 
                 BecomeStacked(Delaying);
             });
-
-
-            Receive<string>(msg =>
-            {
-                notifier.ShowError(msg);
-                BecomeStacked(Delaying);
-            });
         }
 
         private void Delaying()
         {
             Context.System.Scheduler.ScheduleTellOnce(TimeSpan.FromSeconds(0.5), Self, DelayMessage.Instance, Self);
-            Receive<DelayMessage>(m=>
+            Receive<DelayMessage>(_ =>
             {
                 Stash.Unstash();
                 UnbecomeStacked();
             });
+
             ReceiveAny(_ => Stash.Stash());
         }
 
         internal class DelayMessage
         {
             public static DelayMessage Instance { get; } = new DelayMessage();
+        }
+
+        internal class ClearedMessage
+        {
+            public static ClearedMessage Instance { get; } = new ClearedMessage();
         }
     }
 }
