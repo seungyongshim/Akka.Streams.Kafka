@@ -60,13 +60,14 @@ namespace BLUECATS.ToastNotifier
 
                 notificationActor.Tell((NotificationLevel.Info, $"BLUE CATS: Client Start\n{GUID}"));
 
-                KafkaConsumer.PlainSource(consumerSettings, GetSubscription(config))
-                    .RunForeach(result =>
+                RestartSource.WithBackoff(() =>
+                    KafkaConsumer.PlainSource(consumerSettings, GetSubscription(config)),
+                    minBackoff: TimeSpan.FromSeconds(3),
+                    maxBackoff: TimeSpan.FromSeconds(30),
+                    randomFactor: 0.2).RunForeach(result =>
                     {
                         notificationActor.Tell((NotificationLevel.Error, $"Consumer: {result.Topic}/{result.Partition} {result.Offset}: {result.Value}"));
                     }, system.Materializer());
-
-
             }
             catch (Exception ex)
             {
