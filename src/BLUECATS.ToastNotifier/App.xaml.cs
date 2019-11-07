@@ -45,14 +45,14 @@ namespace BLUECATS.ToastNotifier
                 return;
             }
 
-            CreateTrayIcon();
-            CreateNotifier();
-
-            var config = AkkaHelper.ReadConfigurationFromHoconFile(Assembly.GetExecutingAssembly(), "conf")
-                .WithFallback(ConfigurationFactory.FromResource<ConsumerSettings<object, object>>("Akka.Streams.Kafka.reference.conf"));
-
             try
             {
+                var config = AkkaHelper.ReadConfigurationFromHoconFile(Assembly.GetExecutingAssembly(), "conf")
+                    .WithFallback(ConfigurationFactory.FromResource<ConsumerSettings<object, object>>("Akka.Streams.Kafka.reference.conf"));
+
+                CreateTrayIcon(config);
+                CreateNotifier(config);
+
                 var system = ActorSystem.Create("BLUECATS-ToastNotifier", config);
 
                 notificationActor = system.ActorOf(NotificationActor.Props(Notifier), nameof(NotificationActor));
@@ -107,23 +107,27 @@ namespace BLUECATS.ToastNotifier
             return guid.ToString();
         }
 
-        private void CreateNotifier()
+        private void CreateNotifier(Akka.Configuration.Config config)
         {
+            var uiNotificationWidth = config.GetInt("ui.notification.width");
+            var uiNotificationLifetime = config.GetTimeSpan("ui.notification.lifetime");
+            var uiNotificationMax = config.GetInt("ui.notification.maximum-count");
+
             Notifier = new Notifier(cfg =>
             {
-                cfg.DisplayOptions.Width = 370;
+                cfg.DisplayOptions.Width = uiNotificationWidth;
 
                 cfg.PositionProvider = new PrimaryScreenPositionProvider(Corner.BottomRight, 0, 0);
 
                 cfg.LifetimeSupervisor = new TimeAndCountBasedLifetimeSupervisor(
-                    notificationLifetime: TimeSpan.FromSeconds(5),
-                    maximumNotificationCount: MaximumNotificationCount.FromCount(14));
+                    notificationLifetime: uiNotificationLifetime,
+                    maximumNotificationCount: MaximumNotificationCount.FromCount(uiNotificationMax));
 
                 cfg.Dispatcher = Application.Current.Dispatcher;
             });
         }
 
-        private void CreateTrayIcon()
+        private void CreateTrayIcon(Akka.Configuration.Config config)
         {
             NotifyIcon = new System.Windows.Forms.NotifyIcon
             {
@@ -137,7 +141,7 @@ namespace BLUECATS.ToastNotifier
             menu.MenuItems.Add(new System.Windows.Forms.MenuItem(@"&All Clear",
                 onClick: (_, __) =>
                 {
-                    notificationActor.Tell(new ClearAll());
+                    //notificationActor.Tell(new ClearAll());
                     Notifier.ClearMessages(new ClearAll());
                 }));
 

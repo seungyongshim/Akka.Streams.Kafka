@@ -28,13 +28,13 @@ namespace BLUECATS.ToastNotifier.Actors
                     DateTimeZoneHandling = DateTimeZoneHandling.Local,
                 });
                 string message = json.message.ToString();
-                string localtime = json["@timestamp"];
+                string localtime = json["@timestamp"].ToString("yyyy-MM-dd HH:mm:ss.ffffff");
 
 
                 var sb = new StringBuilder();
                 notificationActor.Tell(
                     (NotificationLevel.Error,
-                    sb.AppendLine(string.Format($"[{msg.Topic}]")).Append(msg.Value).ToString())
+                    sb.AppendLine(string.Format($"[{msg.Topic}] {localtime}")).Append(message).ToString())
                 );
             });
 
